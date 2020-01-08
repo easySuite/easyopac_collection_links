@@ -1,0 +1,130 @@
+<?php
+
+/**
+ * @file
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function easyopac_collection_links_menu() {
+  $items = [];
+
+  $items['admin/config/collection-links'] = [
+    'title' => 'Collection Previews: LMS',
+    'description' => 'Configure LMS service for requesting external resources.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => ['easyopac_collection_links_settings_form'],
+    'access arguments' => ['administer site configuration'],
+    'file' => 'easyopac_collection_links.admin.inc',
+  ];
+
+  return $items;
+}
+
+/**
+ * Implements hook_ding_entity_buttons().
+ */
+function easyopac_collection_links_ding_entity_buttons($type, $entity) {
+  $buttons = [];
+
+  if ($type == 'collection') {
+    $lms_service_url = variable_get('easyopac_collection_links_lms_service_url', NULL);
+
+    if (empty($lms_service_url)) {
+      return;
+    }
+
+    /** @var TingCollection $entity */
+    $collection = $entity->getTingObjectCollection()->getObjects();
+
+    $items = [];
+    foreach ($collection as $item) {
+      /** @var \TingEntity $item */
+      $options = [
+        'faustNumber' => $item->id,
+        'withExternalResources' => NULL,
+      ];
+      $url = url($lms_service_url . '/detail', ['query' => $options]);
+
+      $response = drupal_http_request($url);
+      if ($response->code == '200') {
+        $data = drupal_json_decode($response->data);
+        $items[$item->id] = $data['externalResources'];
+      }
+    }
+
+    $clean_items = array_filter($items);
+    $preview = array_values($clean_items);
+
+    if (!empty($preview)) {
+      $preview_url = easyopac_collection_links_generate_preview_url($preview);
+
+      if (!empty($preview_url)) {
+        $buttons['preview'] = [
+          '#type' => 'link',
+          '#href' => $preview_url,
+          '#title' => t('Preview'),
+          '#attributes' => [
+            'class' => [
+              'action-button',
+              'preview',
+            ],
+            'target' => '_blank',
+          ],
+        ];
+      }
+    }
+  }
+
+  return $buttons;
+}
+
+/**
+ * Generate preview link.
+ *
+ * @param array $preview
+ *
+ * @return mixed
+ */
+function easyopac_collection_links_generate_preview_url(array $preview) {
+  $preview_url = NULL;
+
+  switch ($preview) {
+    case key($preview[0]) == 'videos':
+      $preview_url = $preview[0]['videos'][0]['url'];
+      break;
+
+    case key($preview[0]) == 'ebook':
+      $preview_url = $preview[0]['ebook'];
+      break;
+  }
+
+  return $preview_url;
+}
+
+/**
+ * Implements hook_preprocess_HOOK().
+ */
+function easyopac_collection_links_preprocess_ting_object(&$variables) {
+  $multiple = (count($variables['elements']['#object']->ting_entities['und']) > 1);
+
+  if ($multiple) {
+    $collection_button = easyopac_collection_links_ding_entity_buttons('collection', $variables['elements']['#object']);
+
+    if ($collection_button) {
+      if (module_exists('ding_collection_reservation')) {
+        $variables["elements"]["ting_primary_object"][0]["ding_entity_buttons"]['#markup'] .= drupal_render($collection_button);
+      }
+      else {
+        $collection_button += [
+          '#weight' => 191,
+          '#prefix' => '<div class="collections-preview--collection-wrapper">',
+          '#suffix' => '</div>',
+        ];
+
+        $variables['content']['ting_primary_object'][0]['previews'] = $collection_button;
+      }
+    }
+  }
+}
