@@ -2,5 +2,6 @@ name = "easyOPAC collection links"
 description = "Add action button for previewing online items content."
 core = "7.x"
 package = "easyOPAC"
+dependencies[] = colorbox
 configure = admin/config/collection-links
 stylesheets[all][] = css/easyopac_collection_links.css

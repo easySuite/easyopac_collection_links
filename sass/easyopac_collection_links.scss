@@ -1,0 +1,35 @@
+.previewable-pending {
+  display: none !important;
+}
+
+.field-type-ding-entity-buttons {
+  .previewable {
+    background-color: #0a001f;
+    color: white;
+    display: block;
+
+    &:hover {
+      background-color: #808285;
+      color: white;
+    }
+  }
+}
+
+.collections-preview--collection-wrapper {
+  margin-top: 20px;
+  display: inline-block;
+  box-sizing: border-box;
+  width: 100%;
+
+  a {
+    background-color: #0a001f;
+    color: white;
+    display: inline-block;
+    margin: 20px 0;
+
+    &:hover {
+      background-color: #808285;
+      color: white;
+    }
+  }
+}
