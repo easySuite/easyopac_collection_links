@@ -1,8 +1,3 @@
 .previewable-pending { display: none !important; }
 
-.field-type-ding-entity-buttons .previewable { background-color: #0a001f; color: white; display: block; }
-.field-type-ding-entity-buttons .previewable:hover { background-color: #808285; color: white; }
-
-.collections-preview--collection-wrapper { margin-top: 20px; display: inline-block; box-sizing: border-box; width: 100%; }
-.collections-preview--collection-wrapper a { background-color: #0a001f; color: white; display: inline-block; margin: 20px 0; }
-.collections-preview--collection-wrapper a:hover { background-color: #808285; color: white; }
+.field-type-ding-entity-buttons .previewable { display: block; }
