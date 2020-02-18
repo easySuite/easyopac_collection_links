@@ -19,6 +19,63 @@ function easyopac_collection_links_menu() {
     'file' => 'easyopac_collection_links.admin.inc',
   ];
 
+  $items['previews'] = [
+    'title' => 'Get previews for ting objects',
+    'page callback' => 'easyopac_collection_links_ajax_callback',
+    'page arguments' => [1],
+    'access arguments' => ['access content'],
+    'type' => MENU_CALLBACK,
+  ];
+
+  return $items;
+}
+
+/**
+ * Custom AJAX menu item callback.
+ */
+function easyopac_collection_links_ajax_callback() {
+  $result = [];
+
+  if (!empty($_POST['previewedIds']) && is_array($_POST['previewedIds'])) {
+    $ids = $_POST['previewedIds'];
+    $result = easyopac_collection_links_make_request($ids);
+  }
+
+  drupal_json_output($result);
+  drupal_exit();
+}
+
+/**
+ * Perform request to LMS.
+ *
+ * @param array $ids
+ *
+ * @return array|void
+ */
+function easyopac_collection_links_make_request(array $ids) {
+  $lms_service_url = variable_get('easyopac_collection_links_lms_service_url', NULL);
+
+  if (empty($lms_service_url)) {
+    return;
+  }
+
+  $items = [];
+  foreach ($ids as $item) {
+    $options = [
+      'faustNumber' => $item,
+      'withExternalResources' => NULL,
+    ];
+    $url = url($lms_service_url . '/detail', ['query' => $options]);
+
+    $response = drupal_http_request($url);
+    if ($response->code == '200') {
+      $data = drupal_json_decode($response->data);
+      if (!empty($data['externalResources'])) {
+        $items[$item] = easyopac_collection_links_generate_preview_url($data['externalResources']);
+      }
+    }
+  }
+
   return $items;
 }
 
@@ -28,54 +85,42 @@ function easyopac_collection_links_menu() {
 function easyopac_collection_links_ding_entity_buttons($type, $entity) {
   $buttons = [];
 
-  if ($type == 'collection') {
-    $lms_service_url = variable_get('easyopac_collection_links_lms_service_url', NULL);
-
-    if (empty($lms_service_url)) {
-      return;
+  if ($entity instanceof TingCollection) {
+    $ids = [];
+    foreach ($entity->getTingObjectCollection()->getObjects() as $item) {
+      $ids[] = $item->getId();
     }
 
-    /** @var TingCollection $entity */
-    $collection = $entity->getTingObjectCollection()->getObjects();
-
-    $items = [];
-    foreach ($collection as $item) {
-      /** @var \TingEntity $item */
-      $options = [
-        'faustNumber' => $item->id,
-        'withExternalResources' => NULL,
-      ];
-      $url = url($lms_service_url . '/detail', ['query' => $options]);
-
-      $response = drupal_http_request($url);
-      if ($response->code == '200') {
-        $data = drupal_json_decode($response->data);
-        $items[$item->id] = $data['externalResources'];
-      }
-    }
-
-    $clean_items = array_filter($items);
-    $preview = array_values($clean_items);
-
-    if (!empty($preview)) {
-      $preview_url = easyopac_collection_links_generate_preview_url($preview);
-
-      if (!empty($preview_url)) {
-        $buttons['preview'] = [
-          '#type' => 'link',
-          '#href' => $preview_url,
-          '#title' => t('Preview'),
-          '#attributes' => [
-            'class' => [
-              'action-button',
-              'preview',
-            ],
-            'target' => '_blank',
-          ],
-        ];
-      }
+    $result = easyopac_collection_links_make_request($ids);
+    $keys = array_keys($result);
+    if ($keys) {
+      $entity->id = $keys[0];
     }
   }
+
+  $buttons[] = [
+    '#type' => 'link',
+    '#href' => '',
+    '#title' => t('Preview'),
+    '#attributes' => [
+      'class' => [
+        'action-button',
+        'button-preview',
+        'previewable-pending',
+      ],
+      'target' => '_blank',
+      'data-preview-id' => $entity->id,
+    ],
+    '#attached' => [
+      'js' => [
+        [
+          'type' => 'file',
+          'data' => drupal_get_path('module', 'easyopac_collection_links') . '/js/easyopac_collection_links.js',
+        ],
+      ],
+    ],
+    '#weight' => 100,
+  ];
 
   return $buttons;
 }
@@ -91,12 +136,12 @@ function easyopac_collection_links_generate_preview_url(array $preview) {
   $preview_url = NULL;
 
   switch ($preview) {
-    case key($preview[0]) == 'videos':
-      $preview_url = $preview[0]['videos'][0]['url'];
+    case key($preview) == 'videos':
+      $preview_url = $preview['videos'][0]['url'];
       break;
 
-    case key($preview[0]) == 'ebook':
-      $preview_url = $preview[0]['ebook'];
+    case key($preview) == 'ebook':
+      $preview_url = $preview['ebook'];
       break;
   }
 
@@ -108,23 +153,28 @@ function easyopac_collection_links_generate_preview_url(array $preview) {
  */
 function easyopac_collection_links_preprocess_ting_object(&$variables) {
   $multiple = (count($variables['elements']['#object']->ting_entities['und']) > 1);
+  $view_mode = NULL;
+  if (isset($variables["content"]["ting_primary_object"][0]["#view_mode"])) {
+    $view_mode = $variables["content"]["ting_primary_object"][0]["#view_mode"];
+  }
 
-  if ($multiple) {
+  if (isset($variables["elements"]["#view_mode"])) {
+    $view_mode = $variables["elements"]["#view_mode"];
+  }
+
+  if (!empty($view_mode) && ($view_mode == 'search_result' || $view_mode != 'full') && $multiple) {
     $collection_button = easyopac_collection_links_ding_entity_buttons('collection', $variables['elements']['#object']);
+    if (module_exists('ding_collection_reservation')) {
+      $variables["elements"]["ting_primary_object"][0]["ding_entity_buttons"]['#markup'] .= drupal_render($collection_button);
+    }
+    else {
+      $collection_button += [
+        '#weight' => 191,
+        '#prefix' => '<div class="collections-preview--collection-wrapper">',
+        '#suffix' => '</div>',
+      ];
 
-    if ($collection_button) {
-      if (module_exists('ding_collection_reservation')) {
-        $variables["elements"]["ting_primary_object"][0]["ding_entity_buttons"]['#markup'] .= drupal_render($collection_button);
-      }
-      else {
-        $collection_button += [
-          '#weight' => 191,
-          '#prefix' => '<div class="collections-preview--collection-wrapper">',
-          '#suffix' => '</div>',
-        ];
-
-        $variables['content']['ting_primary_object'][0]['previews'] = $collection_button;
-      }
+      $variables['content']['ting_primary_object'][0]['previews_button'] = $collection_button;
     }
   }
 }
