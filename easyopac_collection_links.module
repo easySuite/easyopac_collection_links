@@ -64,6 +64,7 @@ function easyopac_collection_links_make_request(array $ids) {
     $options = [
       'faustNumber' => $item,
       'withExternalResources' => NULL,
+      'withNoCover' => NULL,
     ];
     $url = url($lms_service_url . '/detail', ['query' => $options]);
 
@@ -101,7 +102,7 @@ function easyopac_collection_links_ding_entity_buttons($type, $entity) {
   $buttons[] = [
     '#type' => 'link',
     '#href' => '',
-    '#title' => t('Preview'),
+    '#title' => t('Preview snippet'),
     '#attributes' => [
       'class' => [
         'action-button',
