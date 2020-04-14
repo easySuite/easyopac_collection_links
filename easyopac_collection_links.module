@@ -180,6 +180,16 @@ function easyopac_collection_links_generate_preview_url(array $preview, $type) {
       break;
   }
 
+  // Let's try to find replacement in case the link is empty.
+  if (!$preview_data['url'] && count($preview) > 1) {
+    // Get rid of reviews data.
+    unset($preview['reviews']);
+
+    // Get closest item.s
+    $preview_data['url'] = reset($preview);
+    $mtype = array_key_first($preview);
+  }
+
   $preview_data['type'] = $mtype;
 
   return $preview_data;
