@@ -72,7 +72,9 @@ function easyopac_collection_links_make_request(array $ids) {
     if ($response->code == '200') {
       $data = drupal_json_decode($response->data);
       if (!empty($data['externalResources'])) {
-        $items[$item] = easyopac_collection_links_generate_preview_url($data['externalResources']);
+        $items[$item] = [
+          'data' => easyopac_collection_links_generate_preview_url($data['externalResources'], $data['type']),
+        ];
       }
     }
   }
@@ -93,7 +95,11 @@ function easyopac_collection_links_ding_entity_buttons($type, $entity) {
     }
 
     $result = easyopac_collection_links_make_request($ids);
-    $keys = array_keys($result);
+    $filtered_result = array_filter($result, function ($i) {
+      return !empty($i['data']['url']);
+    });
+
+    $keys = array_keys($filtered_result);
     if ($keys) {
       $entity->id = $keys[0];
     }
@@ -130,23 +136,53 @@ function easyopac_collection_links_ding_entity_buttons($type, $entity) {
  * Generate preview link.
  *
  * @param array $preview
+ *   External resources array from LMS request.
+ * @param string $type
+ *   Requested item material type.
  *
  * @return mixed
  */
-function easyopac_collection_links_generate_preview_url(array $preview) {
+function easyopac_collection_links_generate_preview_url(array $preview, $type) {
+  $mtype = '';
   $preview_url = NULL;
+  $types = [
+    'ebook' => [
+      'Bog',
+      'Ebog',
+    ],
+    'audiobook' => [
+      'Lydbog',
+      'Lydbog (bånd)',
+      'Lydbog (cd)',
+      'Lydbog (net)',
+      'Lydbog (cd-mp3)',
+    ],
+    'videos' => [
+      'Cd (musik)',
+      'Film (net)',
+      'Dvd',
+    ],
+  ];
 
-  switch ($preview) {
-    case key($preview) == 'videos':
-      $preview_url = $preview['videos'][0]['url'];
+  foreach ($types as $k => $mt) {
+    if (in_array($type, $mt)) {
+      $mtype = $k;
+    }
+  }
+
+  switch ($mtype) {
+    case $mtype == 'videos':
+      $preview_data['url'] = $preview['videos'][0]['url'];
       break;
 
-    case key($preview) == 'ebook':
-      $preview_url = $preview['ebook'];
+    default:
+      $preview_data['url'] = $preview[$mtype];
       break;
   }
 
-  return $preview_url;
+  $preview_data['type'] = $mtype;
+
+  return $preview_data;
 }
 
 /**

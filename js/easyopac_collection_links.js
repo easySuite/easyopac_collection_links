@@ -25,13 +25,28 @@
           },
           success: function (result) {
             $.each(result, function (previewedId, previewLink) {
-              if (previewLink) {
-                $(selector + '[data-preview-id="' + previewedId + '"]', context)
-                  .attr('href', previewLink)
-                  .removeClass('previewable-pending')
-                  .addClass('previewable');
+              if (previewLink.data.url) {
+                var title = Drupal.t('Preview snippet');
 
-                var videoId = new RegExp('[\\?&]v=([^&#]*)').exec(previewLink);
+                switch (previewLink.data.type) {
+                  case 'ebook':
+                    title = Drupal.t('Preview ebook');
+                    break;
+                  case 'audiobook':
+                    title = Drupal.t('Preview audiobook');
+                    break;
+                  case 'videos':
+                    title = Drupal.t('Preview videos');
+                    break;
+                }
+
+                $(selector + '[data-preview-id="' + previewedId + '"]', context)
+                  .attr('href', previewLink.data.url)
+                  .removeClass('previewable-pending')
+                  .addClass('previewable')
+                  .html(title);
+
+                var videoId = new RegExp('[\\?&]v=([^&#]*)').exec(previewLink.data.url);
                 if (videoId !== null) {
                   $(selector + '[data-preview-id="' + previewedId + '"]', context).colorbox({
                     iframe: true,
