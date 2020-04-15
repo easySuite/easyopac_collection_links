@@ -72,9 +72,7 @@ function easyopac_collection_links_make_request(array $ids) {
     if ($response->code == '200') {
       $data = drupal_json_decode($response->data);
       if (!empty($data['externalResources'])) {
-        $items[$item] = [
-          'data' => easyopac_collection_links_generate_preview_url($data['externalResources'], $data['type']),
-        ];
+        $items[$item] = easyopac_collection_links_generate_preview_url($data['externalResources']);
       }
     }
   }
@@ -87,6 +85,7 @@ function easyopac_collection_links_make_request(array $ids) {
  */
 function easyopac_collection_links_ding_entity_buttons($type, $entity) {
   $buttons = [];
+  $results = easyopac_collection_links_make_request([$entity->provider_id]);
 
   if ($entity instanceof TingCollection) {
     $ids = [];
@@ -94,40 +93,54 @@ function easyopac_collection_links_ding_entity_buttons($type, $entity) {
       $ids[] = $item->getId();
     }
 
-    $result = easyopac_collection_links_make_request($ids);
-    $filtered_result = array_filter($result, function ($i) {
-      return !empty($i['data']['url']);
-    });
+    $results = easyopac_collection_links_make_request($ids);
 
-    $keys = array_keys($filtered_result);
+    $keys = array_keys($results);
     if ($keys) {
       $entity->id = $keys[0];
     }
   }
 
-  $buttons[] = [
-    '#type' => 'link',
-    '#href' => '',
-    '#title' => t('Preview snippet'),
-    '#attributes' => [
-      'class' => [
-        'action-button',
-        'button-preview',
-        'previewable-pending',
-      ],
-      'target' => '_blank',
-      'data-preview-id' => $entity->id,
-    ],
-    '#attached' => [
-      'js' => [
-        [
-          'type' => 'file',
-          'data' => drupal_get_path('module', 'easyopac_collection_links') . '/js/easyopac_collection_links.js',
+  foreach ($results as $item) {
+    $title = t('Preview snippet');
+
+    foreach ($item as $type => $url) {
+      if ($type == 'videos') {
+        $title = t('Preview videos');
+      }
+      elseif ($type == 'ebook') {
+        $title = t('Preview ebook');
+      }
+      elseif ($type == 'audiobook') {
+        $title = t('Preview audiobook');
+      }
+
+      $buttons[$type] = [
+        '#type' => 'link',
+        '#href' => '',
+        '#title' => $title,
+        '#attributes' => [
+          'class' => [
+            'action-button',
+            'button-preview',
+            'previewable-pending',
+          ],
+          'target' => '_blank',
+          'data-preview-id' => $entity->id,
+          'data-preview-type' => $type,
         ],
-      ],
-    ],
-    '#weight' => 100,
-  ];
+        '#attached' => [
+          'js' => [
+            [
+              'type' => 'file',
+              'data' => drupal_get_path('module', 'easyopac_collection_links') . '/js/easyopac_collection_links.js',
+            ],
+          ],
+        ],
+        '#weight' => 100,
+      ];
+    }
+  }
 
   return $buttons;
 }
@@ -137,62 +150,19 @@ function easyopac_collection_links_ding_entity_buttons($type, $entity) {
  *
  * @param array $preview
  *   External resources array from LMS request.
- * @param string $type
- *   Requested item material type.
  *
  * @return mixed
  */
-function easyopac_collection_links_generate_preview_url(array $preview, $type) {
-  $mtype = '';
-  $preview_url = NULL;
-  $types = [
-    'ebook' => [
-      'Bog',
-      'Ebog',
-    ],
-    'audiobook' => [
-      'Lydbog',
-      'Lydbog (bånd)',
-      'Lydbog (cd)',
-      'Lydbog (net)',
-      'Lydbog (cd-mp3)',
-    ],
-    'videos' => [
-      'Cd (musik)',
-      'Film (net)',
-      'Dvd',
-    ],
-  ];
-
-  foreach ($types as $k => $mt) {
-    if (in_array($type, $mt)) {
-      $mtype = $k;
-    }
-  }
-
-  switch ($mtype) {
-    case $mtype == 'videos':
-      $preview_data['url'] = $preview['videos'][0]['url'];
-      break;
-
-    default:
-      $preview_data['url'] = $preview[$mtype];
-      break;
-  }
-
-  // Let's try to find replacement in case the link is empty.
-  if (!$preview_data['url'] && count($preview) > 1) {
-    // Get rid of reviews data.
+function easyopac_collection_links_generate_preview_url(array $preview) {
+  if (isset($preview['reviews'])) {
     unset($preview['reviews']);
-
-    // Get closest item.s
-    $preview_data['url'] = reset($preview);
-    $mtype = array_key_first($preview);
   }
 
-  $preview_data['type'] = $mtype;
+  if (isset($preview['videos'])) {
+    $preview['videos'] = $preview['videos'][0]['url'];
+  }
 
-  return $preview_data;
+  return $preview;
 }
 
 /**
