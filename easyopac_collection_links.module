@@ -159,7 +159,7 @@ function easyopac_collection_links_generate_preview_url(array $preview) {
   }
 
   if (isset($preview['videos'])) {
-    $preview['videos'] = $preview['videos'][0]['url'];
+    unset($preview['videos']);
   }
 
   return $preview;
