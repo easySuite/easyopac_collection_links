@@ -85,6 +85,7 @@ function easyopac_collection_links_make_request(array $ids) {
  */
 function easyopac_collection_links_ding_entity_buttons($type, $entity) {
   $buttons = [];
+  $results = easyopac_collection_links_make_request([$entity->provider_id]);
 
   if ($entity instanceof TingCollection) {
     $ids = [];
@@ -92,36 +93,51 @@ function easyopac_collection_links_ding_entity_buttons($type, $entity) {
       $ids[] = $item->getId();
     }
 
-    $result = easyopac_collection_links_make_request($ids);
-    $keys = array_keys($result);
+    $results = easyopac_collection_links_make_request($ids);
+
+    $keys = array_keys($results);
     if ($keys) {
       $entity->id = $keys[0];
     }
   }
 
-  $buttons[] = [
-    '#type' => 'link',
-    '#href' => '',
-    '#title' => t('Preview snippet'),
-    '#attributes' => [
-      'class' => [
-        'action-button',
-        'button-preview',
-        'previewable-pending',
-      ],
-      'target' => '_blank',
-      'data-preview-id' => $entity->id,
-    ],
-    '#attached' => [
-      'js' => [
-        [
-          'type' => 'file',
-          'data' => drupal_get_path('module', 'easyopac_collection_links') . '/js/easyopac_collection_links.js',
+  foreach ($results as $item) {
+    $title = t('Preview snippet');
+
+    foreach ($item as $type => $url) {
+      if ($type == 'ebook') {
+        $title = t('Preview ebook');
+      }
+      elseif ($type == 'audiobook') {
+        $title = t('Preview audiobook');
+      }
+
+      $buttons[$type] = [
+        '#type' => 'link',
+        '#href' => '',
+        '#title' => $title,
+        '#attributes' => [
+          'class' => [
+            'action-button',
+            'button-preview',
+            'previewable-pending',
+          ],
+          'target' => '_blank',
+          'data-preview-id' => $entity->id,
+          'data-preview-type' => $type,
         ],
-      ],
-    ],
-    '#weight' => 100,
-  ];
+        '#attached' => [
+          'js' => [
+            [
+              'type' => 'file',
+              'data' => drupal_get_path('module', 'easyopac_collection_links') . '/js/easyopac_collection_links.js',
+            ],
+          ],
+        ],
+        '#weight' => 100,
+      ];
+    }
+  }
 
   return $buttons;
 }
@@ -130,23 +146,20 @@ function easyopac_collection_links_ding_entity_buttons($type, $entity) {
  * Generate preview link.
  *
  * @param array $preview
+ *   External resources array from LMS request.
  *
  * @return mixed
  */
 function easyopac_collection_links_generate_preview_url(array $preview) {
-  $preview_url = NULL;
-
-  switch ($preview) {
-    case key($preview) == 'videos':
-      $preview_url = $preview['videos'][0]['url'];
-      break;
-
-    case key($preview) == 'ebook':
-      $preview_url = $preview['ebook'];
-      break;
+  if (isset($preview['reviews'])) {
+    unset($preview['reviews']);
   }
 
-  return $preview_url;
+  if (isset($preview['videos'])) {
+    unset($preview['videos']);
+  }
+
+  return $preview;
 }
 
 /**
