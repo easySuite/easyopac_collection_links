@@ -31,11 +31,25 @@ function easyopac_collection_links_menu() {
 }
 
 /**
+ * Implements hook_page_alter().
+ */
+function easyopac_collection_links_page_alter(&$vars) {
+  $args = arg();
+
+  if ($args[0] == 'search' && $args[1] == 'ting' || $args[0] == 'ting' && ($args[1] == 'object' || $args[1] == 'collection')) {
+    drupal_add_js(drupal_get_path('module', 'easyopac_collection_links') . '/js/easyopac_collection_links.js', [
+      'type' => 'file',
+      'scope' => 'footer',
+      'defer' => TRUE,
+    ]);
+  }
+}
+
+/**
  * Custom AJAX menu item callback.
  */
 function easyopac_collection_links_ajax_callback() {
   $result = [];
-
   if (!empty($_POST['previewedIds']) && is_array($_POST['previewedIds'])) {
     $ids = $_POST['previewedIds'];
     $result = easyopac_collection_links_make_request($ids);
@@ -59,20 +73,27 @@ function easyopac_collection_links_make_request(array $ids) {
     return;
   }
 
-  $items = [];
-  foreach ($ids as $item) {
-    $options = [
-      'faustNumber' => $item,
-      'withExternalResources' => NULL,
-      'withNoCover' => NULL,
-    ];
-    $url = url($lms_service_url . '/detail', ['query' => $options]);
+  if (empty($ids)) {
+    return;
+  }
 
-    $response = drupal_http_request($url);
-    if ($response->code == '200') {
-      $data = drupal_json_decode($response->data);
-      if (!empty($data['externalResources'])) {
-        $items[$item] = easyopac_collection_links_generate_preview_url($data['externalResources']);
+  $ids = implode(',', $ids);
+
+  $items = [];
+  $options = [
+    'include' => $ids,
+    'withMeta' => NULL,
+  ];
+  $url = url($lms_service_url . '/search', ['query' => $options]);
+
+  $response = drupal_http_request($url);
+  if ($response->code == '200') {
+    $data = drupal_json_decode($response->data);
+    $data = $data['objects'];
+
+    foreach ($data as $datum) {
+      if (!empty($datum['externalResources'])) {
+        $items[$datum['id']] = easyopac_collection_links_generate_preview_url($datum['externalResources']);
       }
     }
   }
@@ -85,59 +106,22 @@ function easyopac_collection_links_make_request(array $ids) {
  */
 function easyopac_collection_links_ding_entity_buttons($type, $entity) {
   $buttons = [];
-  $results = easyopac_collection_links_make_request([$entity->provider_id]);
 
-  if ($entity instanceof TingCollection) {
-    $ids = [];
-    foreach ($entity->getTingObjectCollection()->getObjects() as $item) {
-      $ids[] = $item->getId();
-    }
-
-    $results = easyopac_collection_links_make_request($ids);
-
-    $keys = array_keys($results);
-    if ($keys) {
-      $entity->id = $keys[0];
-    }
-  }
-
-  foreach ($results as $item) {
-    $title = t('Preview snippet');
-
-    foreach ($item as $type => $url) {
-      if ($type == 'ebook') {
-        $title = t('Preview ebook');
-      }
-      elseif ($type == 'audiobook') {
-        $title = t('Preview audiobook');
-      }
-
-      $buttons[$type] = [
-        '#type' => 'link',
-        '#href' => '',
-        '#title' => $title,
-        '#attributes' => [
-          'class' => [
-            'action-button',
-            'button-preview',
-            'previewable-pending',
-          ],
-          'target' => '_blank',
-          'data-preview-id' => $entity->id,
-          'data-preview-type' => $type,
-        ],
-        '#attached' => [
-          'js' => [
-            [
-              'type' => 'file',
-              'data' => drupal_get_path('module', 'easyopac_collection_links') . '/js/easyopac_collection_links.js',
-            ],
-          ],
-        ],
-        '#weight' => 100,
-      ];
-    }
-  }
+  $buttons[] = [
+    '#type' => 'link',
+    '#href' => '',
+    '#title' => t('Preview'),
+    '#attributes' => [
+      'class' => [
+        'action-button',
+        'button-preview',
+        'previewable-pending',
+      ],
+      'target' => '_blank',
+      'data-preview-id' => $entity->id,
+    ],
+    '#weight' => 100,
+  ];
 
   return $buttons;
 }

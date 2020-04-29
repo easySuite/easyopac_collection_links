@@ -1,45 +1,52 @@
 /**
- * Checks if there is a preview for materials before activating the preview
- * button.
+ * @file
+ * Checks for a materials preview before activating the preview button.
  */
 
 (function ($) {
-
   "use strict";
 
-  Drupal.behaviors.easyopac_collection_links = {
-    attach: function (context) {
-      let previewedIds = [];
-      let selector = '.button-preview';
-      $(selector, context).once('button-preview', function () {
-        previewedIds.push($(this).data("preview-id"));
-      });
+  $(document).ready(function () {
+    let previewedIds = [];
+    let selector = '.button-preview';
 
-      if (previewedIds.length) {
-        $.ajax({
-          dataType: 'json',
-          type: 'POST',
-          url: '/previews',
-          data: {
-            previewedIds: previewedIds
-          },
-          success: function (result) {
-            $.each(result, function (previewedId, previewLinks) {
-              $.each(previewLinks, function (previewType, previewLink) {
-                if (previewLink) {
-                  $(selector + '[data-preview-id="' + previewedId + '"][data-preview-type="' + previewType + '"]', context)
-                    .attr('href', previewLink)
-                    .removeClass('previewable-pending')
-                    .addClass('previewable');
+    $(selector).each(function () {
+      previewedIds.push($(this).data("preview-id"));
+    });
 
-                  // Add some styling for collection items.
-                  $('.collections-preview--collection-wrapper').find('.previewable').parent().css('border-top', '1px solid #c6c6c6');
+    if (previewedIds.length) {
+      $.ajax({
+        dataType: 'json',
+        type: 'POST',
+        url: '/previews',
+        data: {
+          previewedIds: previewedIds
+        },
+        success: function (result) {
+          $.each(result, function (previewedId, previewLinks) {
+            $.each(previewLinks, function (previewType, previewLink) {
+              if (previewLink) {
+                let btnTitle = Drupal.t('Preview');
+                if (previewType === 'ebook') {
+                  btnTitle = Drupal.t('Preview ebook');
                 }
-              });
+                if (previewType === 'audiobook') {
+                  btnTitle = Drupal.t('Preview audiobook');
+                }
+
+                $(selector + '[data-preview-id="' + previewedId + '"]')
+                  .attr('href', previewLink)
+                  .removeClass('previewable-pending')
+                  .addClass('previewable')
+                  .html(btnTitle);
+
+                // Add some styling for collection items.
+                $('.collections-preview--collection-wrapper').find('.previewable').parent().css('border-top', '1px solid #c6c6c6');
+              }
             });
-          }
-        });
-      }
+          });
+        }
+      });
     }
-  };
+  });
 })(jQuery);
