@@ -114,6 +114,10 @@ function easyopac_collection_links_make_request(array $ids, $type) {
 
     $id = $ids[0];
 
+    if (!preg_match('/^\d+-\w+:[[:alnum:]]+/', rawurldecode($id))) {
+      return;
+    }
+
     $options = [
       'faustNumber' => $id,
       'withExternalResources' => NULL,
