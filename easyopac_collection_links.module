@@ -114,9 +114,7 @@ function easyopac_collection_links_make_request(array $ids, $type) {
 
     $id = $ids[0];
 
-    preg_match('/[\-\:]/', $id, $matches);
-
-    if (empty($matches)) {
+    if (!preg_match('/^\d+[-]\w+(:|%3A)\d+/', $id)) {
       return;
     }
 
