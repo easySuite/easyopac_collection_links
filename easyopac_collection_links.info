@@ -1,7 +1,7 @@
 name = "easyOPAC collection links"
 description = "Add action button for previewing online items content."
 core = "7.x"
-version = 7.x-6.0.2
+version = 7.x-6.1.0
 package = "easyOPAC"
 dependencies[] = colorbox
 configure = admin/config/collection-links
