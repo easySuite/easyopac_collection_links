@@ -114,10 +114,15 @@ function easyopac_collection_links_make_request(array $ids, $type) {
 
     $id = $ids[0];
 
+    if (!preg_match('/^\d+-\w+:[[:alnum:]]+/', rawurldecode($id))) {
+      return;
+    }
+
     $options = [
       'faustNumber' => $id,
       'withExternalResources' => NULL,
       'withNoCover' => NULL,
+      '_source' => 'easyopac_collection_links',
     ];
   }
   else {
@@ -127,6 +132,7 @@ function easyopac_collection_links_make_request(array $ids, $type) {
     $options = [
       'include' => $ids,
       'withMeta' => NULL,
+      '_source' => 'easyopac_collection_links',
     ];
   }
   $url = url($lms_service_url . $action, ['query' => $options]);
