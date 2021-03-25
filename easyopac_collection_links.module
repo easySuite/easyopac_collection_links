@@ -55,7 +55,7 @@ function easyopac_collection_links_proxy() {
 function easyopac_collection_links_page_alter(&$vars) {
   $args = arg();
 
-  if ($args[0] == 'search' && $args[1] == 'ting' || $args[0] == 'ting' && ($args[1] == 'object' || $args[1] == 'collection')) {
+  if (($args[0] == 'search' && $args[1] == 'ting') || ($args[0] == 'ting' && ($args[1] == 'object' || $args[1] == 'collection'))) {
     drupal_add_js(
       [
         'easyopac_collection_links' => [
@@ -211,19 +211,16 @@ function easyopac_collection_links_generate_preview_url(array $preview) {
  * Implements hook_preprocess_HOOK().
  */
 function easyopac_collection_links_preprocess_ting_object(&$variables) {
-  $multiple = (count($variables['elements']['#object']->ting_entities['und']) > 1);
-  $view_mode = NULL;
-  if (isset($variables["content"]["ting_primary_object"][0]["#view_mode"])) {
-    $view_mode = $variables["content"]["ting_primary_object"][0]["#view_mode"];
-  }
-
-  if (isset($variables["elements"]["#view_mode"])) {
-    $view_mode = $variables["elements"]["#view_mode"];
-  }
+  $ting_entities = $variables['elements']['#object']->ting_entities;
+  $multiple = (isset($ting_entities[LANGUAGE_NONE]) && count($ting_entities[LANGUAGE_NONE]) > 1);
+  $view_mode = $variables["elements"]["#view_mode"] ?? $variables["content"]["ting_primary_object"][0]["#view_mode"] ?? NULL;
 
   if (!empty($view_mode) && ($view_mode == 'search_result' || $view_mode != 'full') && $multiple) {
     $collection_button = easyopac_collection_links_ding_entity_buttons('collection', $variables['elements']['#object']);
     if (module_exists('ding_collection_reservation')) {
+      if (empty($variables['elements']['ting_primary_object'][0]['ding_entity_buttons']['#markup'])) {
+        return;
+      }
       $variables["elements"]["ting_primary_object"][0]["ding_entity_buttons"]['#markup'] .= drupal_render($collection_button);
     }
     else {
@@ -240,7 +237,7 @@ function easyopac_collection_links_preprocess_ting_object(&$variables) {
     $entity_buttons = $variables['elements']['ding_entity_buttons'][0];
 
     foreach ($entity_buttons as $key => $entity_button) {
-      if ($entity_button['#title'] == 'Preview') {
+      if (isset($entity_button['#title']) && $entity_button['#title'] == t('Preview')) {
         unset($variables['elements']['ding_entity_buttons'][0][$key]);
       }
     }
